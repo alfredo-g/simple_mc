@@ -1,0 +1,3 @@
+[submodule "mc/libs/simplex"]
+	path = mc/libs/simplex
+	url = https://github.com/SRombauts/SimplexNoise
