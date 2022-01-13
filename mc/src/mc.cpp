@@ -42,6 +42,7 @@ SearchForChunk(World_Map* world, v2i chunkPos) {
 #if 1
 struct ChunkGen_Data {
     World_Map* World;
+    Open_GL* OpenGL;
     std::vector<v2i>* NewChunks;
     i32 ReplaceChunkIndex;
 };
@@ -55,10 +56,10 @@ internal WORK_QUEUE_CALLBACK(ChunkGenWork) {
     v2i last = genData->NewChunks->back();
     chunk->WorldPosition = v2i{last.x, last.y};
     Chunk_GenerateNew(chunk, genData->World->ChunkDim, genData->World->ChunkDimY, genData->World->WorldGenSeed);
+    genData->OpenGL->RenderData[replaceIndex] = Render_Chunk(genData->World, chunk);
     genData->NewChunks->pop_back();
     chunk->IsLoaded = false;
     free(data);
-    //printf("+NewChunk: %d\n", replaceIndex);
 }
 #endif
 
@@ -205,8 +206,6 @@ void Game_UpdateAndRender(Game_Memory* gameMemory, Game_Input* input, Open_GL* o
             }
         }
         
-        //printf("nchunks: %lu\n", ArrayCount(chunkList));
-        //printf("newOnes: %lu\n", GlobalNewChunks.size());
         std::vector<ChunkGen_Data*> ChunkGenDataList;
         
         // Remove old chunks
@@ -236,6 +235,7 @@ void Game_UpdateAndRender(Game_Memory* gameMemory, Game_Input* input, Open_GL* o
                     // Replace the old one with the new one
                     ChunkGen_Data* data = (ChunkGen_Data*)calloc(1, sizeof(*data));
                     data->World = world;
+                    data->OpenGL = openGL;
                     data->NewChunks = &GlobalNewChunks;
                     data->ReplaceChunkIndex = i;
                     platformAPI->AddRenderWork(platformAPI->RenderQueue, ChunkGenWork, data);
@@ -258,8 +258,6 @@ void Game_UpdateAndRender(Game_Memory* gameMemory, Game_Input* input, Open_GL* o
             Chunk* chunk = world->Chunks + renderIndex;
             
             if(!chunk->IsLoaded) {
-                openGL->RenderData[renderIndex] = Render_Chunk(world, chunk);
-                
                 LoadVertexBuffer(openGL, &openGL->RenderData[renderIndex]);
                 chunk->IsLoaded = true;
             }
