@@ -11,9 +11,12 @@
 
 #include <stdint.h>
 #include <stdio.h>
-#include <vector>
 #include <time.h>
+#include <math.h>
+#include <string.h>
+#include <vector>
 #include <unordered_map>
+#include <string>
 
 // TODO: Remove glm
 #include <glm/vec2.hpp>
@@ -45,10 +48,10 @@ typedef double f64;
 #define internal static
 #define global static
 
-#define Kilobytes(value) ((value)*1024LL)
-#define Megabytes(value) (Kilobytes(value)*1024LL)
-#define Gigabytes(value) (Megabytes(value)*1024LL)
-#define Terabytes(value) (Gigabytes(value)*1024LL)
+#define Kilobytes(val) ((val)*1024LL)
+#define Megabytes(val) (Kilobytes(val)*1024LL)
+#define Gigabytes(val) (Megabytes(val)*1024LL)
+#define Terabytes(val) (Gigabytes(val)*1024LL)
 
 #include "mc_math.h"
 
@@ -107,11 +110,12 @@ struct Open_GL {
     //
     void (*RemoveBuffer)(u32* vao, u32* vbo);
     void (*DrawToScreen)(Open_GL* openGL);
-    void (*SendChunkBuffer)(u32* vao, u32* vbo, size_t vertexSizeBytes, void* vertexData);
+    void (*SendChunkBuffer)(Open_GL* openGL, Render_Result* render);
     void (*UniformU32)(i32 nameLoc, u32 value);
     void (*UniformV3)(i32 nameLoc, v3 value);
     void (*UniformV2)(i32 nameLoc, v2 value);
-    void (*UniformMat4x4)(i32 nameLoc, glm::mat4& mat4);
+    void (*UniformMat4x42)(i32 nameLoc, glm::mat4& mat4);
+    void (*UniformMat4x4)(i32 nameLoc, m4x4 mat4);
 };
 
 enum Game_Input_Key_Type {

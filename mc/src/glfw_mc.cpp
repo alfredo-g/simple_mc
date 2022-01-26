@@ -34,9 +34,6 @@ struct Work_Queue {
     
     Queue_Entry Entries[256];
 };
-struct Thread_Info {
-    Work_Queue* Queue;
-};
 
 global Work_Queue GlobalRenderQueue;
 
@@ -131,6 +128,7 @@ GLFW_ReadFile(char* filename) {
 internal void
 GLFW_MousePositionChangeCallback(GLFWwindow* window, f64 x, f64 y) {
     (void)window;
+    printf("x: %f .. y: %f\r", x, y);
     
     GlobalInput.MouseX = x;
     GlobalInput.MouseY = y;
@@ -148,10 +146,9 @@ GLFW_MousePositionChangeCallback(GLFWwindow* window, f64 x, f64 y) {
 }
 internal void
 GLFW_KeyPressCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    (void)window; (void)scancode; (void)mods;
+    (void)window; (void)scancode;
     
-    if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-    }
+    //if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {}
     
     GlobalInput.ShiftPressed = mods == GLFW_MOD_SHIFT;
     b32 isPressed = action == GLFW_PRESS || action == GLFW_REPEAT;
@@ -294,7 +291,7 @@ int main() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE); // Center the window then show it
+    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
     //glfwWindowHint(GLFW_RESIZABLE, GL_TRUE);
     
     GlobalOpenGL.WindowWidth = 1280;
@@ -308,12 +305,11 @@ int main() {
     
     const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
     glfwSetWindowPos(window, (mode->width-GlobalOpenGL.WindowWidth)/2, (mode->height-GlobalOpenGL.WindowHeight)/2);
-    glfwShowWindow(window);
+    glfwShowWindow(window); // Show after center
     
     glfwMakeContextCurrent(window);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    // Enable VSYNC
-    glfwSwapInterval(1);
+    glfwSwapInterval(1); // Enable VSYNC
     // Callbacks
     glfwSetCursorPosCallback(window, GLFW_MousePositionChangeCallback);
     glfwSetKeyCallback(window, GLFW_KeyPressCallback);
@@ -325,15 +321,11 @@ int main() {
         return -1;
     }
     
-    GlobalOpenGL.UniformU32 = OpenGL_UniformU32;
-    GlobalOpenGL.UniformMat4x4 = OpenGL_UniformMat4x4;
-    GlobalOpenGL.UniformV3 = OpenGL_UniformV3;
-    GlobalOpenGL.UniformV2 = OpenGL_UniformV2;
-    GlobalOpenGL.SendChunkBuffer = OpenGL_SendChunkBuffer;
-    GlobalOpenGL.RemoveBuffer = OpenGL_RemoveBuffer;
-    GlobalOpenGL.DrawToScreen = OpenGL_DrawToScreen;
     OpenGL_Init(&GlobalOpenGL);
     glViewport(0, 0, GlobalOpenGL.WindowWidth, GlobalOpenGL.WindowHeight);
+    GLuint textureSamplerID = Texture_Generate("../assets/mc_atlas.png");
+    OpenGL_UniformI32(GlobalOpenGL.TextureLoc, textureSamplerID);
+    glUseProgram(GlobalOpenGL.ProgramID);
     
 #if COMPILER_MSVC
     HANDLE semaphoreHandle = CreateSemaphoreEx(0, 0, 1, 0, 0, SEMAPHORE_ALL_ACCESS);
@@ -344,17 +336,13 @@ int main() {
     GlobalRenderQueue.SemaphoreHandle = semaphoreHandle;
     
     Game_Memory gameMemory = {};
-    gameMemory.MemorySize = Kilobytes(1);
+    gameMemory.MemorySize = Megabytes(32);
     gameMemory.Memory = calloc(gameMemory.MemorySize, 1);
     gameMemory.PlatformAPI.ReadEntireFile = GLFW_ReadFile;
     gameMemory.PlatformAPI.AddRenderWork = GLFW_AddRenderWork;
     gameMemory.PlatformAPI.ClearRenderWork = GLFW_ClearRenderWork;
     gameMemory.PlatformAPI.RenderWorkCompleted = GLFW_RenderWorkCompleted;
     gameMemory.PlatformAPI.RenderQueue = &GlobalRenderQueue;
-    
-    GLuint textureSamplerID = Texture_Generate("../assets/mc_atlas.png");
-    OpenGL_UniformI32(GlobalOpenGL.TextureLoc, textureSamplerID);
-    glUseProgram(GlobalOpenGL.ProgramID);
     
 #if COMPILER_MSVC
     DWORD threadID;

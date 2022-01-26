@@ -76,23 +76,23 @@ Render_Chunk(World_Map* world, Chunk* chunk) {
                 v3i cubeVertices[UNIQUE_VERTICES_PER_CUBE] = {
                     // Top: 
                     // Back left
-                    {x, y+1, z},       // 0
+                    V3i(x, y+1, z),       // 0
                     // Back right
-                    {x+1, y+1, z},      // 1
+                    V3i(x+1, y+1, z),      // 1
                     // Front left
-                    {x, y+1, z+1},      // 2
+                    V3i(x, y+1, z+1),      // 2
                     // Front right
-                    {x+1, y+1, z+1},    // 3
+                    V3i(x+1, y+1, z+1),    // 3
                     
                     // Bottom:
                     // Back left
-                    {x, y, z},      // 4
+                    V3i(x, y, z),      // 4
                     // Back right
-                    {x+1, y, z},    // 5
+                    V3i(x+1, y, z),    // 5
                     // Front left
-                    {x, y, z+1},    // 6
+                    V3i(x, y, z+1),    // 6
                     // Front right
-                    {x+1, y, z+1},  // 7
+                    V3i(x+1, y, z+1),  // 7
                 };
                 
                 //

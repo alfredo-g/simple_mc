@@ -5,7 +5,7 @@ struct Block_Format {
     } Faces[3]; // Top, Side, Bottom
 };
 
-global std::unordered_map<Block_ID, Block_Format> GlobalBlockFormat;
+global Block_Format GlobalBlockFormat[BlockID_LAST];
 
 internal void
 Block_LoadLocationUV(Platform_API* platform) {
@@ -15,14 +15,21 @@ Block_LoadLocationUV(Platform_API* platform) {
         v2 UVS[4];
     };
     
+#ifdef __EMSCRIPTEN__
+    Read_Result readed = platform->ReadEntireFile("./assets/uv_location.mc");
+#else
     Read_Result readed = platform->ReadEntireFile("../assets/uv_location.mc");
+#endif
     Assert(readed.ContentSize);
+    Assert(readed.Data);
+    
     UV_Info* info = (UV_Info*)readed.Data;
     
     // Map the texture name with the index for fast lookups
     std::unordered_map<std::string, u32> uvInfoMap;
     for(u32 index = 0; index < info->ItemCount; ++index) {
-        uvInfoMap[std::string(info[index].Name)] = index;
+        std::string name = std::string(info[index].Name);
+        uvInfoMap[name] = index;
     }
     
     //

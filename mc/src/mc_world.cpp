@@ -31,18 +31,18 @@ Chunk_GetBlock(World_Map* world, Chunk* chunk, i32 x, u32 y, i32 z) {
         v2i chunkPos;
         v3i blockPos;
         if(x < 0) {
-            chunkPos = v2i{(i32)chunk->WorldPosition.x + x, (i32)chunk->WorldPosition.y};
-            blockPos = v3i{(i32)dimX+x, (i32)y, z};
+            chunkPos = V2i((i32)chunk->WorldPosition.x + x, (i32)chunk->WorldPosition.y);
+            blockPos = V3i((i32)dimX+x, (i32)y, z);
         } else if(z < 0) {
-            chunkPos = v2i{(i32)chunk->WorldPosition.x, (i32)chunk->WorldPosition.y + z};
-            blockPos = v3i{x, (i32)y, (i32)dimZ+z};
+            chunkPos = V2i((i32)chunk->WorldPosition.x, (i32)chunk->WorldPosition.y + z);
+            blockPos = V3i(x, (i32)y, (i32)dimZ+z);
         } else if((u32)x >= dimX) {
-            chunkPos = v2i{(i32)chunk->WorldPosition.x + (i32)((dimX+1)-x), (i32)chunk->WorldPosition.y};
-            blockPos = v3i{(i32)(dimX-x), (i32)y, z};
+            chunkPos = V2i((i32)chunk->WorldPosition.x + (i32)((dimX+1)-x), (i32)chunk->WorldPosition.y);
+            blockPos = V3i((i32)(dimX-x), (i32)y, z);
             Assert(blockPos.x == 0);
         } else {
-            chunkPos = v2i{(i32)chunk->WorldPosition.x, (i32)chunk->WorldPosition.y + (i32)((dimZ+1)-z)};
-            blockPos = v3i{x, (i32)y, (i32)(dimZ-z)};
+            chunkPos = V2i((i32)chunk->WorldPosition.x, (i32)chunk->WorldPosition.y + (i32)((dimZ+1)-z));
+            blockPos = V3i(x, (i32)y, (i32)(dimZ-z));
             Assert(blockPos.z == 0);
         }
         
@@ -71,16 +71,18 @@ Chunk_GetBlock(World_Map* world, Chunk* chunk, i32 x, u32 y, i32 z) {
 
 internal void
 Chunk_GenerateNew(Chunk* chunk, u32 chunkDim, u32 chunkDimY, i32 seed) {
+    if(!chunk) return; // TODO: Logging
+    
+    Assert(chunk->Blocks);
     const u32 chunkDimZ = chunkDim;
-    chunk->Blocks = (Block*)calloc(chunkDim * chunkDimY * chunkDimZ, sizeof(Block));
-    i32 chunkPosX = chunk->WorldPosition.x*chunkDim;
-    i32 chunkPosZ = chunk->WorldPosition.y*chunkDimZ;
+    const i32 chunkPosX = chunk->WorldPosition.x*chunkDim;
+    const i32 chunkPosZ = chunk->WorldPosition.y*chunkDimZ;
     
     SimplexNoise generator = SimplexNoise();
     const f32 incrementSize = 1000.0f;
     
     for (u32 y = 0; y < chunkDimY; y++) {
-        for (u32 z = 0; z < chunkDim; z++) {
+        for (u32 z = 0; z < chunkDimZ; z++) {
             for (u32 x = 0; x < chunkDim; x++) {
                 Block* cube = chunk->Blocks + z*chunkDimY*chunkDim + y*chunkDim + x;
                 
@@ -95,7 +97,8 @@ Chunk_GenerateNew(Chunk* chunk, u32 chunkDim, u32 chunkDimY, i32 seed) {
                 stoneHeight = (stoneHeight * maxHeight) / 127;
                 
                 if(y == 0) { // Bottom of the chunk
-                    cube->ID = BlockID_Bedrock;
+                    //cube->ID = BlockID_Bedrock;
+                    cube->ID = BlockID_Sand;
                 } else if(y == maxHeight) { // Top of the chunk
                     cube->ID = BlockID_Grass;
                 } else if(y < stoneHeight) {
@@ -109,18 +112,24 @@ Chunk_GenerateNew(Chunk* chunk, u32 chunkDim, u32 chunkDimY, i32 seed) {
 }
 
 internal void
-World_GenerateMap(World_Map* world) {
+World_GenerateMap(Memory_Arena* arena, World_Map* world) {
     
     srand((u32)time(0));
     world->WorldGenSeed = world->WorldGenSeed ? world->WorldGenSeed : (i32)(((f32)rand() / (f32)RAND_MAX) * 1000.0f);
     printf("Seed: %d\n", world->WorldGenSeed);
     
+    const u32 chunkDimX = world->ChunkDim;
+    const u32 chunkDimY = world->ChunkDimY;
+    const u32 chunkDimZ = chunkDimX;
+    
     for(i32 z = 0; z < (i32)world->ChunkCount; ++z) {
         for(i32 x = 0; x < (i32)world->ChunkCount; ++x) {
             Chunk* chunk = world->Chunks + z*world->ChunkCount + x;
-            chunk->WorldPosition = v2i{x, z};
+            chunk->WorldPosition = V2i(x, z);
             
-            Chunk_GenerateNew(chunk, world->ChunkDim, world->ChunkDimY, world->WorldGenSeed);
+            chunk->Blocks = PushArray(arena, chunkDimX * chunkDimY * chunkDimZ, Block);
+            
+            Chunk_GenerateNew(chunk, chunkDimX, chunkDimY, world->WorldGenSeed);
         }
     }
 }
