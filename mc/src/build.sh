@@ -27,6 +27,6 @@ else
 	## WASM -s INITIAL_MEMORY=<X> -s PTHREAD_POOL_SIZE=1 -s USE_PTHREADS=1
 	WASM_FLAGS="-std=c++11 -Wall -Wextra -Wno-write-strings -O2"
 	WASM_FLAGS="$WASM_FLAGS -s USE_WEBGL2=1 -s FULL_ES3=1 -s USE_GLFW=3 -s WASM=1 -s MAX_WEBGL_VERSION=2 -s MIN_WEBGL_VERSION=2 -s LLD_REPORT_UNDEFINED -s ALLOW_MEMORY_GROWTH=1 -s EXPORTED_RUNTIME_METHODS=['ccall']"
-	#emcc ../../src/web_mc.cpp ../../src/mc.cpp ../../libs/simplex/src/SimplexNoise.cpp -o index.js $INCLUDE $WASM_FLAGS --preload-file assets
+	emcc ../../src/web_mc.cpp ../../src/mc.cpp ../../libs/simplex/src/SimplexNoise.cpp -o index.js $INCLUDE $WASM_FLAGS --preload-file assets
 	popd
 fi
