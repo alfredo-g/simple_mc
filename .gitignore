@@ -1,4 +1,5 @@
 mc/build
+x11_mc.cpp
 
 # Prerequisites
 *.d
