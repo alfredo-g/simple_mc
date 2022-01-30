@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
 
 #include <emscripten/emscripten.h>
 #include <GLES3/gl3.h>
@@ -16,6 +17,27 @@ global Open_GL GlobalOpenGL;
 global Game_Input GlobalInput;
 global b32 GlobalMouseVisible;
 global GLFWwindow* GlobalWindow;
+
+#if 0
+struct Queue_Entry {
+    work_callback* Callback;
+    void* Data;
+};
+struct Work_Queue {
+    volatile u32 NextEntry;
+    volatile u32 CompletionGoal;
+    volatile u32 CompletionCount;
+#if COMPILER_MSVC
+    HANDLE SemaphoreHandle;
+#elif COMPILER_GCC
+    sem_t SemaphoreHandle;
+#endif
+    
+    Queue_Entry Entries[256];
+};
+
+global Work_Queue GlobalRenderQueue;
+#endif
 
 #if 1
 EM_JS(int, canvas_get_width, (), {
@@ -133,6 +155,67 @@ API_ResizeWindow(int width, int height) {
     GlobalOpenGL.WindowHeight = height;
 }
 
+#if 0
+internal void
+GLFW_AddRenderWork(Work_Queue* queue, work_callback* callback, void* data) {
+    if(queue->NextEntry == ArrayCount(queue->Entries)) return;
+    Queue_Entry* entry = queue->Entries + queue->CompletionGoal;
+    
+    entry->Callback = callback;
+    entry->Data = data;
+    
+    queue->CompletionGoal++;
+    sem_post(&queue->SemaphoreHandle);
+}
+
+internal b32
+GLFW_DoNextWork(Work_Queue* queue) {
+    b32 weShouldSleep = false;
+    
+    u32 originalNextEntry = queue->NextEntry;
+    if(originalNextEntry < queue->CompletionGoal) {
+        u32 index = __sync_val_compare_and_swap(&queue->NextEntry, originalNextEntry, originalNextEntry+1);
+        
+        if(index == originalNextEntry) {
+            Queue_Entry entry = queue->Entries[index];
+            entry.Callback(queue, entry.Data);
+            __sync_add_and_fetch(&queue->CompletionCount, 1);
+        }
+    } else {
+        weShouldSleep = true;
+    }
+    
+    return weShouldSleep;
+}
+
+internal void*
+GLFW_ThreadProc(void* param) {
+    Work_Queue* queue = (Work_Queue*)param;
+    
+    for(;;) {
+        
+        if(GLFW_DoNextWork(queue)) {
+            sem_wait(&queue->SemaphoreHandle);
+        }
+    }
+    
+    return 0;
+}
+
+internal b32
+GLFW_RenderWorkCompleted(Work_Queue* queue) {
+    b32 result = queue->CompletionCount == queue->CompletionGoal;
+    
+    if(result) {
+        queue->NextEntry = 0;
+        queue->CompletionGoal = 0;
+        queue->CompletionCount = 0;
+    }
+    
+    return result;
+}
+#endif
+
 internal void 
 MainLoop(void* data) {
     Game_Memory* gameMemory = (Game_Memory*)data;
@@ -159,6 +242,7 @@ int main() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, 4);
     
     GlobalOpenGL.WindowWidth = canvas_get_width();
     GlobalOpenGL.WindowHeight = canvas_get_height();
@@ -186,14 +270,25 @@ int main() {
     OpenGL_UniformI32(GlobalOpenGL.TextureLoc, textureSamplerID); 
     glUseProgram(GlobalOpenGL.ProgramID);
     
+#if 0
+    sem_t semaphoreHandle;
+    sem_init(&semaphoreHandle, 0, 1);
+    GlobalRenderQueue.SemaphoreHandle = semaphoreHandle;
+    pthread_t threadHandle;
+    pthread_create(&threadHandle, 0, GLFW_ThreadProc, &GlobalRenderQueue);
+    pthread_detach(threadHandle);
+#endif
+    
     Game_Memory gameMemory = {};
     gameMemory.MemorySize = Megabytes(32);
-    gameMemory.Memory = calloc(gameMemory.MemorySize, 1);
+    gameMemory.TransientSize = Megabytes(2);
+    gameMemory.Memory = mmap(0, gameMemory.MemorySize+gameMemory.TransientSize,
+                             PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE, -1, 0);
+    gameMemory.TransientMemory = (u8*)gameMemory.Memory + gameMemory.MemorySize;
     gameMemory.PlatformAPI.ReadEntireFile = GLFW_ReadFile;
-    gameMemory.PlatformAPI.AddRenderWork = 0; //GLFW_AddRenderWork;
-    gameMemory.PlatformAPI.ClearRenderWork = 0; //GLFW_ClearRenderWork;
-    gameMemory.PlatformAPI.RenderWorkCompleted = 0; //GLFW_RenderWorkCompleted;
-    gameMemory.PlatformAPI.RenderQueue = 0; //&GlobalRenderQueue;
+    gameMemory.PlatformAPI.AddRenderWork = 0;//GLFW_AddRenderWork;
+    gameMemory.PlatformAPI.RenderWorkCompleted = 0;//GLFW_RenderWorkCompleted;
+    gameMemory.PlatformAPI.RenderQueue = 0;//&GlobalRenderQueue;
     
     //
     // Main Loop

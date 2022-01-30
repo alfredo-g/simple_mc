@@ -55,6 +55,49 @@ typedef double f64;
 
 #include "mc_math.h"
 
+//---------------------------Memory Management
+struct Memory_Arena {
+    size_t Used;
+    size_t Size;
+    u8* Base;
+};
+
+inline void
+InitArena(Memory_Arena* arena, size_t size, void* base) {
+    arena->Size = size;
+    arena->Used = 0;
+    arena->Base = (u8*)base;
+}
+
+#define PushStruct(arena, type) (type*)PushSize_(arena, sizeof(type))
+#define PushArray(arena, count, type) (type*)PushSize_(arena, (count)*sizeof(type))
+inline void*
+PushSize_(Memory_Arena* arena, size_t size) {
+    Assert(arena->Used + size <= arena->Size);
+    void* result = arena->Base + arena->Used;
+    arena->Used += size;
+    
+    return result;
+}
+#if 0
+inline void
+PopSize_(Memory_Arena* arena, size_t size) {
+    Assert(((arena->Base+arena->Used) - size) >= arena->Base);
+    arena->Used -= size;
+}
+#endif
+
+#define ZeroStruct(instance) ZeroSize(&(instance), sizeof(instance))
+#define ZeroArray(ptr, count) ZeroSize(ptr, count*sizeof((ptr)[0]))
+inline void
+ZeroSize(void* ptr, size_t size) {
+    u8* byte = (u8*)ptr;
+    while(size--) {
+        *byte++ = 0;
+    }
+}
+//-
+
 struct Read_Result {
     u32 ContentSize;
     void* Data;
@@ -69,7 +112,7 @@ struct Platform_API {
     
     Read_Result (*ReadEntireFile)(char* filename);
     void (*AddRenderWork)(Work_Queue* queue, work_callback* callback, void* data);
-    void (*ClearRenderWork)(Work_Queue* queue);
+    //void (*ClearRenderWork)(Work_Queue* queue);
     b32 (*RenderWorkCompleted)(Work_Queue* queue);
 };
 
@@ -100,7 +143,8 @@ struct Open_GL {
     u32 ProgramID;
     Render_Result* RenderData;
     size_t RenderCount;
-    b32 NewChunksToRender;
+    i32 NewChunksToRender;
+    Memory_Arena RenderArena;
     // Uniform locations
     i32 TextureLoc;
     i32 ViewLoc;
@@ -110,7 +154,7 @@ struct Open_GL {
     //
     void (*RemoveBuffer)(u32* vao, u32* vbo);
     void (*DrawToScreen)(Open_GL* openGL);
-    void (*SendChunkBuffer)(Open_GL* openGL, Render_Result* render);
+    void (*SendChunkBuffer)(Render_Result* render);
     void (*UniformU32)(i32 nameLoc, u32 value);
     void (*UniformV3)(i32 nameLoc, v3 value);
     void (*UniformV2)(i32 nameLoc, v2 value);
@@ -141,8 +185,10 @@ struct Game_Input {
 struct Game_Memory {
     b32 IsInitialized;
     
-    void* Memory;
     u64 MemorySize;
+    void* Memory;
+    u64 TransientSize;
+    void* TransientMemory;
     Platform_API PlatformAPI;
 };
 

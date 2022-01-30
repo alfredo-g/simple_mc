@@ -1,5 +1,6 @@
 #include "mc_platform.h"
 
+#include <sys/mman.h>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <stb/stb_image.h>
@@ -24,7 +25,7 @@ struct Queue_Entry {
 };
 struct Work_Queue {
     volatile u32 NextEntry;
-    volatile u32 EntryCount;
+    volatile u32 CompletionGoal;
     volatile u32 CompletionCount;
 #if COMPILER_MSVC
     HANDLE SemaphoreHandle;
@@ -128,8 +129,6 @@ GLFW_ReadFile(char* filename) {
 internal void
 GLFW_MousePositionChangeCallback(GLFWwindow* window, f64 x, f64 y) {
     (void)window;
-    printf("x: %f .. y: %f\r", x, y);
-    
     GlobalInput.MouseX = x;
     GlobalInput.MouseY = y;
     
@@ -199,13 +198,12 @@ GLFW_KeyPressCallback(GLFWwindow* window, int key, int scancode, int action, int
 internal void
 GLFW_AddRenderWork(Work_Queue* queue, work_callback* callback, void* data) {
     if(queue->NextEntry == ArrayCount(queue->Entries)) return;
-    //Assert(queue->EntryCount < ArrayCount(queue->Entries));
-    Queue_Entry* entry = queue->Entries + queue->EntryCount;
+    Queue_Entry* entry = queue->Entries + queue->CompletionGoal;
     
     entry->Callback = callback;
     entry->Data = data;
     
-    queue->EntryCount++;
+    queue->CompletionGoal++;
 #if COMPILER_MSVC
     ReleaseSemaphore(&queue->SemaphoreHandle, 1, 0);
 #elif COMPILER_GCC
@@ -218,7 +216,7 @@ GLFW_DoNextWork(Work_Queue* queue) {
     b32 weShouldSleep = false;
     
     u32 originalNextEntry = queue->NextEntry;
-    if(originalNextEntry < queue->EntryCount) {
+    if(originalNextEntry < queue->CompletionGoal) {
 #if COMPILER_MSVC
         u32 index = InterlockedCompareExchange((LONG volatile*)&queue->NextEntry, originalNextEntry+1, originalNextEntry);
 #elif COMPILER_GCC
@@ -264,17 +262,15 @@ GLFW_ThreadProc(void* param) {
     return 0;
 }
 
-internal void
-GLFW_ClearRenderWork(Work_Queue* queue) {
-    memset(queue->Entries, 0, sizeof(queue->Entries));
-    queue->NextEntry = 0;
-    queue->EntryCount = 0;
-    queue->CompletionCount = 0;
-}
-
 internal b32
 GLFW_RenderWorkCompleted(Work_Queue* queue) {
-    b32 result = queue->CompletionCount == queue->EntryCount;
+    b32 result = queue->CompletionCount == queue->CompletionGoal;
+    
+    if(result) {
+        queue->NextEntry = 0;
+        queue->CompletionGoal = 0;
+        queue->CompletionCount = 0;
+    }
     
     return result;
 }
@@ -292,6 +288,7 @@ int main() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+    glfwWindowHint(GLFW_SAMPLES, 4);
     //glfwWindowHint(GLFW_RESIZABLE, GL_TRUE);
     
     GlobalOpenGL.WindowWidth = 1280;
@@ -335,15 +332,6 @@ int main() {
 #endif
     GlobalRenderQueue.SemaphoreHandle = semaphoreHandle;
     
-    Game_Memory gameMemory = {};
-    gameMemory.MemorySize = Megabytes(32);
-    gameMemory.Memory = calloc(gameMemory.MemorySize, 1);
-    gameMemory.PlatformAPI.ReadEntireFile = GLFW_ReadFile;
-    gameMemory.PlatformAPI.AddRenderWork = GLFW_AddRenderWork;
-    gameMemory.PlatformAPI.ClearRenderWork = GLFW_ClearRenderWork;
-    gameMemory.PlatformAPI.RenderWorkCompleted = GLFW_RenderWorkCompleted;
-    gameMemory.PlatformAPI.RenderQueue = &GlobalRenderQueue;
-    
 #if COMPILER_MSVC
     DWORD threadID;
     HANDLE threadHandle = CreateThread(0, 0, GLFW_ThreadProc, &GlobalRenderQueue, 0, &threadID);
@@ -353,6 +341,17 @@ int main() {
     pthread_create(&threadHandle, 0, GLFW_ThreadProc, &GlobalRenderQueue);
     pthread_detach(threadHandle);
 #endif
+    
+    Game_Memory gameMemory = {};
+    gameMemory.MemorySize = Megabytes(32);
+    gameMemory.TransientSize = Megabytes(2);
+    gameMemory.Memory = mmap(0, gameMemory.MemorySize+gameMemory.TransientSize,
+                             PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE, -1, 0);
+    gameMemory.TransientMemory = (u8*)gameMemory.Memory + gameMemory.MemorySize;
+    gameMemory.PlatformAPI.ReadEntireFile = GLFW_ReadFile;
+    gameMemory.PlatformAPI.AddRenderWork = GLFW_AddRenderWork;
+    gameMemory.PlatformAPI.RenderWorkCompleted = GLFW_RenderWorkCompleted;
+    gameMemory.PlatformAPI.RenderQueue = &GlobalRenderQueue;
     
     int frames = 0;
     f64 lastTime = glfwGetTime();

@@ -120,7 +120,7 @@ Texture_Generate(char* path) {
 }
 
 internal void
-OpenGL_SendChunkBuffer(Open_GL* openGL, Render_Result* render) {
+OpenGL_SendChunkBuffer(Render_Result* render) {
     const size_t vertexSizeInBytes = render->VertexCount*sizeof(Vertex);
     
     // VAO
@@ -130,7 +130,6 @@ OpenGL_SendChunkBuffer(Open_GL* openGL, Render_Result* render) {
     glGenBuffers(1, &render->VBO);
     glBindBuffer(GL_ARRAY_BUFFER, render->VBO);
     //
-    (void)openGL;
     glBufferData(GL_ARRAY_BUFFER, vertexSizeInBytes, render->VertexData, GL_STATIC_DRAW);
     glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, sizeof(Vertex), (void*)offsetof(Vertex, CompressData));
     glEnableVertexAttribArray(0);

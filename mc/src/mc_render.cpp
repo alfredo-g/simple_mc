@@ -7,8 +7,8 @@ enum Cube_Face {
     FaceTop,
 };
 
-internal Render_Result 
-Render_Chunk(World_Map* world, Chunk* chunk) {
+internal void
+Render_Chunk(Memory_Arena* arena, World_Map* world, Chunk* chunk, Render_Result* result) {
     u32 chunkDimY = world->ChunkDimY;
     u32 chunkDimX = world->ChunkDim;
     u32 chunkDimZ = chunkDimX;
@@ -44,6 +44,14 @@ Render_Chunk(World_Map* world, Chunk* chunk) {
     
     const size_t vertexCount = chunkDimX * chunkDimY * chunkDimZ * VERTEX_PER_CUBE;
     Vertex* vertexList = (Vertex*)calloc(vertexCount, sizeof(Vertex));
+    (void)arena;
+#if 0
+    if(!result->VertexData && !result->VertexCount) {
+        result->VertexData = PushArray(arena, vertexCount, Vertex);
+    } else {
+        ZeroArray(result->VertexData, vertexCount);
+    }
+#endif
     
     Vertex* vertex = vertexList;
     for(i32 y = 0; y < (i32)chunkDimY; y++) {
@@ -273,14 +281,11 @@ Render_Chunk(World_Map* world, Chunk* chunk) {
         }
     }
     
-    //size_t sizeBytes = sizeUsed * sizeof(Vertex);
-    
     size_t sizeUsed = vertex - vertexList;
-    Render_Result data;
-    data.VertexCount = sizeUsed;
-    data.ChunkPosition.x = chunk->WorldPosition.x;
-    data.ChunkPosition.y = chunk->WorldPosition.y;
-    data.VertexData = vertexList;
+    result->VertexCount = sizeUsed;
+    result->ChunkPosition.x = chunk->WorldPosition.x;
+    result->ChunkPosition.y = chunk->WorldPosition.y;
+    result->VertexData = vertexList;
     
-    return data;
+    //LoadVertexBuffer(openGL, result);
 }
