@@ -1,5 +1,7 @@
 @echo off
 
+REM NOTE: Haven't tested this yet
+
 call mc\misc\shell.bat 
 
 IF NOT EXIST mc\build mkdir mc\build

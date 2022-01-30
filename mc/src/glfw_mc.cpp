@@ -15,6 +15,8 @@
 
 #include "opengl.cpp"
 
+// NOTE: Haven't tested the Windows version of this
+
 global Open_GL GlobalOpenGL;
 global Game_Input GlobalInput;
 global b32 GlobalMouseVisible;
